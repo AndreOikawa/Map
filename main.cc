@@ -17,11 +17,13 @@ using namespace std;
 // 2 = start
 // 3 = wall
 
+enum Tile { WALL, END, START, FLOOR};
 
 class Cell {
 public:
 	int _x;
 	int _y;
+	Tile _source;
 	Cell() {}
 	Cell(int x, int y) : _x(x), _y(y) {}
 	Cell operator+(const Cell& c) {
@@ -31,10 +33,10 @@ public:
 
 void print(const vector<vector<int>>& grid) {
 	for (int i = 0; i < grid.size(); i++) {
-		for (int j = 0; j < grid[0].size(); j++) {
-			cout << grid[i][j];
+		for (int j = 0; j < grid[i].size() - 1; j++) {
+			cout << grid[i][j] << ",";
 		}
-		cout << endl;
+		cout << grid[i][grid[i].size() - 1] << endl;
 	}
 }
 
@@ -45,35 +47,45 @@ Cell getEmptyCell(const vector<vector<int>>& grid) {
 	Cell cell;
 	do {
 		cell = Cell(rand() % x, rand() % y);	
-	} while(grid[cell._x][cell._y] != 0);
+	} while(grid[cell._x][cell._y] != WALL);
 	return cell;
 }
 
-bool isValidWall(vector<vector<int>>& grid, Cell cell) {
+bool isInside(vector<vector<int>>& grid, Cell cell) {
+	int x = grid.size();
+	int y = grid[0].size();
+	return cell._x >= 0 && cell._x < x && cell._y >= 0 && cell._y < y;
+}
+
+bool isValidFloor(vector<vector<int>>& grid, Cell cell) {
 	int x = grid.size();
 	int y = grid[0].size();
 
 	// is inside grid
-	if (cell._x >= 0 && cell._x < x && cell._y >= 0 && cell._y < y) {
-		// is floor
-		if (grid[cell._x][cell._y] == 0) {
+	if (isInside(grid, cell)) {
+		// is wall
+		if (grid[cell._x][cell._y] == WALL) {
 			int adjFloor = 0;
 			for (int i = -1; i <= 1; i += 2) {
-				for (int j = -1; j <= 1; j+= 2) {
-					int ax = cell._x + i;
-					int ay = cell._y + j;
-					// has valid adjacent floor
-					if (ax >= 0 && ax < x && ay >= 0 && ay < y && grid[ax][ay] == 0) {
-						adjFloor++;
-					}
+				// for (int j = -1; j <= 1; j+= 2) {
+				int ax = cell._x + i;
+				// has valid adjacent floor
+				if (ax >= 0 && ax < x && grid[ax][cell._y] != WALL) {
+					adjFloor++;
 				}
+				int ay = cell._y + i;
+				if (ay >= 0 && ay < y && grid[cell._x][ay] != WALL) {
+					adjFloor++;
+				}
+				// }
 			}
-			if (adjFloor > 2) {
+			if (adjFloor < 2) {
 				return true;
-			} else if ((cell._x == 0 || cell._y == 0 || cell._x == x - 1 || cell._y == y - 1)
-						&& adjFloor > 0) {
-				return true;
-			}
+			} 
+			// else if ((cell._x == 0 || cell._y == 0 || cell._x == x - 1 || cell._y == y - 1)
+			// 			&& adjFloor > 0) {
+			// 	return true;
+			// }
 
 		}
 	}
@@ -84,56 +96,98 @@ bool isValidWall(vector<vector<int>>& grid, Cell cell) {
 void generateMap(vector<vector<int>>& grid) {
 	int x = grid.size();
 	int y = grid[0].size();
+	queue<Cell> floors;
 
 	// start
-	{
+	
 		Cell start = getEmptyCell(grid);
-		grid[start._x][start._y] = 2;
-	}
+		start._source = START;
+		floors.push(start);
+		grid[start._x][start._y] = START;
+	
 
 	// end
-	{
+	
 		Cell end = getEmptyCell(grid);
-		grid[end._x][end._y] = 1;
-	}
+		end._source = END;
+		floors.push(end);
+		grid[end._x][end._y] = END;
+	
 
-	// walls
+	// floor
 	{
-		int totalTiles = x * y;
-		int numWallSeeds = sqrt(totalTiles) - 1;
-
-		queue<Cell> walls;
-
-		for (int i = 0; i <= numWallSeeds; i++) {
-			Cell wall = getEmptyCell(grid);
-			grid[wall._x][wall._y] = 3;
-			walls.push(wall);
-		}
-
 		vector<Cell> directions;
-		directions.push_back(Cell(-1,-1));
-		directions.push_back(Cell(-1,1));
-		directions.push_back(Cell(1,-1));
-		directions.push_back(Cell(1,1));
+		directions.push_back(Cell(0,-1));
+		directions.push_back(Cell(0,1));
+		directions.push_back(Cell(1,0));
+		directions.push_back(Cell(-1,0));
 		random_shuffle(directions.begin(), directions.end());
 
-		while (!walls.empty()) {
-			Cell wall = walls.front();
-			walls.pop();
-			for (auto it = directions.begin(); it != directions.end(); it++) {
-				Cell tryWall = wall + *it;
-				if (isValidWall(grid, tryWall)) {
-					grid[tryWall._x][tryWall._y] = 3;
-					walls.push(tryWall);
+		while(!floors.empty()) {
+			Cell floor = floors.front();
+			floors.pop();
+			for (auto it = directions.begin(); it != directions.end() - 1; it++) {
+				Cell tryFloor = floor + *it;
+				if (isValidFloor(grid, tryFloor)) {
+					grid[tryFloor._x][tryFloor._y] = floor._source;//FLOOR;
+					tryFloor._source = floor._source;
+					// cout << (floor._source == START ? "start" : "end") << endl;
+					floors.push(tryFloor);
 				}
 			}
 			random_shuffle(directions.begin(), directions.end());
 		}
+
+		{
+			vector<Cell> walls;
+			vector<Cell> floorTile;
+			for (int i = 0; i < x; i++) {
+				for (int j = 0; j < y; j++) {
+					if (grid[i][j] == WALL) {
+						walls.push_back(Cell(i,j));
+					} else {
+						floorTile.push_back(Cell(i,j));
+					}
+				}
+			}
+
+			random_shuffle(walls.begin(), walls.end());
+
+			for (int i = 0; i < walls.size(); i++) {
+				Cell wall = walls[i];
+
+				bool s = false;
+				bool e = false;
+				cout << "from: " << wall._x << " " << wall._y << endl;
+				for (auto it = directions.begin(); it != directions.end(); it++) {
+					Cell tryWall = wall + *it;
+					if (isInside(grid, tryWall)) {
+						if (grid[tryWall._x][tryWall._y] == END) e = true;
+						if (grid[tryWall._x][tryWall._y] == START) s = true;
+					}
+					if (s && e) {
+						cout << "found" << endl;
+						grid[tryWall._x][tryWall._y] = FLOOR;
+						break;
+					}
+				}
+				if (s && e) break;
+			}
+
+			for (int i = 0; i < floorTile.size(); i++) {
+				grid[floorTile[i]._x][floorTile[i]._y] = FLOOR;
+			}
+		}
+
+		grid[start._x][start._y] = START;
+		grid[end._x][end._y] = END;
+
 	}
 
 }
 
 int main(int argc, char *argv[]) {
+	// cout << argc << endl;
 	if (argc != 3 && argc != 1) {
 		cout << "Require grid size:  x y" << endl << "Default: 10x10" << endl;
 		return 1;
