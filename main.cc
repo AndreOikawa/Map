@@ -29,6 +29,9 @@ public:
 	Cell operator+(const Cell& c) {
 		return Cell(c._x + _x, c._y + _y);
 	}
+	Cell operator-(const Cell& c) {
+		return (Cell(_x - c._x, _y - c._y));
+	}
 };
 
 void print(const vector<vector<int>>& grid) {
@@ -55,6 +58,10 @@ bool isInside(vector<vector<int>>& grid, Cell cell) {
 	int x = grid.size();
 	int y = grid[0].size();
 	return cell._x >= 0 && cell._x < x && cell._y >= 0 && cell._y < y;
+}
+
+int getDistance(Cell a, Cell b) {
+	return abs(a._x - b._x) + abs(a._y - b._y);
 }
 
 bool isValidFloor(vector<vector<int>>& grid, Cell cell) {
@@ -93,7 +100,7 @@ bool isValidFloor(vector<vector<int>>& grid, Cell cell) {
 	return false;
 }
 
-void generateMap(vector<vector<int>>& grid) {
+void generateMap(vector<vector<int>>& grid, bool easy) {
 	int x = grid.size();
 	int y = grid[0].size();
 	queue<Cell> floors;
@@ -101,14 +108,19 @@ void generateMap(vector<vector<int>>& grid) {
 	// start
 	
 		Cell start = getEmptyCell(grid);
+		Cell end = getEmptyCell(grid);
+
+		while(getDistance(start, end) < max(x, y)) {
+			start = getEmptyCell(grid);
+			end = getEmptyCell(grid);
+		}
+
 		start._source = START;
 		floors.push(start);
 		grid[start._x][start._y] = START;
-	
 
 	// end
 	
-		Cell end = getEmptyCell(grid);
 		end._source = END;
 		floors.push(end);
 		grid[end._x][end._y] = END;
@@ -126,13 +138,15 @@ void generateMap(vector<vector<int>>& grid) {
 		while(!floors.empty()) {
 			Cell floor = floors.front();
 			floors.pop();
-			for (auto it = directions.begin(); it != directions.end() - 1; it++) {
+			for (auto it = directions.begin(); it != directions.end(); it++) {
 				Cell tryFloor = floor + *it;
 				if (isValidFloor(grid, tryFloor)) {
 					grid[tryFloor._x][tryFloor._y] = floor._source;//FLOOR;
 					tryFloor._source = floor._source;
 					// cout << (floor._source == START ? "start" : "end") << endl;
 					floors.push(tryFloor);
+					floors.push(floor);
+					break;
 				}
 			}
 			random_shuffle(directions.begin(), directions.end());
@@ -152,26 +166,58 @@ void generateMap(vector<vector<int>>& grid) {
 			}
 
 			random_shuffle(walls.begin(), walls.end());
+			int numWalls = walls.size() / 2;
+			bool singleSoln = false;
 
 			for (int i = 0; i < walls.size(); i++) {
+				if (numWalls <= 0 && singleSoln) {
+					break;
+				}
+				numWalls--;
 				Cell wall = walls[i];
 
-				bool s = false;
-				bool e = false;
+				vector<Cell> s;
+				vector<Cell> e;
+
+				// bool s = false;
+				// bool e = false;
+
 				cout << "from: " << wall._x << " " << wall._y << endl;
 				for (auto it = directions.begin(); it != directions.end(); it++) {
 					Cell tryWall = wall + *it;
 					if (isInside(grid, tryWall)) {
-						if (grid[tryWall._x][tryWall._y] == END) e = true;
-						if (grid[tryWall._x][tryWall._y] == START) s = true;
+						if (grid[tryWall._x][tryWall._y] == END) e.push_back(tryWall);
+						if (grid[tryWall._x][tryWall._y] == START) s.push_back(tryWall);
 					}
-					if (s && e) {
+					if (s.size() > 0 && e.size() > 0) {
 						cout << "found" << endl;
-						grid[tryWall._x][tryWall._y] = FLOOR;
-						break;
+						// grid[wall._x][wall._y] = START;
+						// break;
 					}
 				}
-				if (s && e) break;
+				if (s.size() == 1 && e.size() == 1 && !singleSoln) {
+					grid[wall._x][wall._y] = FLOOR;
+					singleSoln = true;
+					// break;
+				} else if (s.size() + e.size() == 2 && numWalls > 0 && easy) {
+					Cell a;
+					Cell b;
+					if (s.size() > 0) {
+						a = s[0];
+						b = s[1];
+					} else if (e.size() > 0) {
+						a = e[0];
+						b = e[1];
+					}
+					Cell c = wall + (a - wall + b - wall);
+					cout << "a: " << a._x << " " << a._y << endl;
+					cout << "b: " << b._x << " " << b._y << endl;
+					cout << "c: " << c._x << " " << c._y << endl;
+					if (grid[c._x][c._y] == WALL) {
+						grid[wall._x][wall._y] = FLOOR;
+					}
+					
+				}
 			}
 
 			for (int i = 0; i < floorTile.size(); i++) {
@@ -195,19 +241,22 @@ int main(int argc, char *argv[]) {
 
 	int x = 10;
 	int y = 10;
-
-	if (argc == 3) {
+	bool easy = false;
+	if (argc >= 3) {
 		istringstream(argv[1]) >> x;
 		istringstream(argv[2]) >> y;
 		if (x == 0) x = 10;
 		if (y == 0) y = 10;
 		cout << "Grid size " << x << "x" << y << endl;
 	}
+	if (argc == 4) {
+		easy = true;
+	}
 
 	vector<vector<int>> grid(x,vector<int>(y));
 	srand (time(NULL));
 
-	generateMap(grid);
+	generateMap(grid, easy);
 
 	print(grid);
 }
