@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <fstream>
 #include <iostream>		/* cout */
 #include <queue>
 #include <string>		
@@ -33,6 +34,18 @@ public:
 		return (Cell(_x - c._x, _y - c._y));
 	}
 };
+
+void save(const vector<vector<int>>& grid, string name) {
+	ofstream file;
+	file.open(name, ios::trunc | ios::out);
+	for (int i = 0; i < grid.size(); i++) {
+		for (int j = 0; j < grid[i].size() - 1; j++) {
+			file << grid[i][j] << ",";
+		}
+		file << grid[i][grid[i].size() - 1] << endl;
+	}
+	file.close();
+}
 
 void print(const vector<vector<int>>& grid) {
 	for (int i = 0; i < grid.size(); i++) {
@@ -182,18 +195,18 @@ void generateMap(vector<vector<int>>& grid, bool easy) {
 				// bool s = false;
 				// bool e = false;
 
-				cout << "from: " << wall._x << " " << wall._y << endl;
+				// cout << "from: " << wall._x << " " << wall._y << endl;
 				for (auto it = directions.begin(); it != directions.end(); it++) {
 					Cell tryWall = wall + *it;
 					if (isInside(grid, tryWall)) {
 						if (grid[tryWall._x][tryWall._y] == END) e.push_back(tryWall);
 						if (grid[tryWall._x][tryWall._y] == START) s.push_back(tryWall);
 					}
-					if (s.size() > 0 && e.size() > 0) {
-						cout << "found" << endl;
-						// grid[wall._x][wall._y] = START;
-						// break;
-					}
+					// if (s.size() > 0 && e.size() > 0) {
+					// 	// cout << "found" << endl;
+					// 	// grid[wall._x][wall._y] = START;
+					// 	// break;
+					// }
 				}
 				if (s.size() == 1 && e.size() == 1 && !singleSoln) {
 					grid[wall._x][wall._y] = FLOOR;
@@ -210,9 +223,9 @@ void generateMap(vector<vector<int>>& grid, bool easy) {
 						b = e[1];
 					}
 					Cell c = wall + (a - wall + b - wall);
-					cout << "a: " << a._x << " " << a._y << endl;
-					cout << "b: " << b._x << " " << b._y << endl;
-					cout << "c: " << c._x << " " << c._y << endl;
+					// cout << "a: " << a._x << " " << a._y << endl;
+					// cout << "b: " << b._x << " " << b._y << endl;
+					// cout << "c: " << c._x << " " << c._y << endl;
 					if (grid[c._x][c._y] == WALL) {
 						grid[wall._x][wall._y] = FLOOR;
 					}
@@ -230,6 +243,114 @@ void generateMap(vector<vector<int>>& grid, bool easy) {
 
 	}
 
+}
+
+void backtrack(vector<vector<int>>& grid, vector<vector<int>>& copy, Cell end, int step) {
+	vector<Cell> directions;
+	directions.push_back(Cell(0,-1));
+	directions.push_back(Cell(0,1));
+	directions.push_back(Cell(1,0));
+	directions.push_back(Cell(-1,0));
+
+	Cell curr = end;
+	while (step != -1) {
+		bool changed = false;
+		// cout << "back" << endl;
+		for (auto it = directions.begin(); it != directions.end(); it++) {
+			Cell adjacent = curr + *it;
+			// cout << adjacent._x << " " << adjacent._y << endl;
+			if (isInside(grid, adjacent) && copy[adjacent._x][adjacent._y] == step) {
+				grid[adjacent._x][adjacent._y] = step;
+				step++;
+				curr = adjacent;
+				// cout << "found" << endl;
+				changed = true;
+				break;
+			}
+		}
+		if (!changed) {
+			cout << "bad tile" << endl;
+			break;
+		}
+	}
+
+	cout << "Solved" << endl;
+	print(grid);
+	save(grid, "solution.txt");
+
+
+}
+
+void solveMap(vector<vector<int>>& grid) {
+	int x = grid.size();
+	int y = grid[0].size();
+	vector<vector<int>> copy = grid;
+
+	Cell start = Cell(-1,-1);
+
+	for (int i = 0; i < x; i++) {
+		for (int j = 0; j < y; j++) {
+			if (copy[i][j] == START) {
+				start._x = i;
+				start._y = j;
+				copy[i][j] = -1;
+				i = x;
+				j = y;
+			}
+		}
+	}
+
+	queue<Cell> path;
+	path.push(start);
+
+	vector<Cell> directions;
+	directions.push_back(Cell(0,-1));
+	directions.push_back(Cell(0,1));
+	directions.push_back(Cell(1,0));
+	directions.push_back(Cell(-1,0));
+
+	while(!path.empty()) {
+		Cell curr = path.front();
+		path.pop();
+
+		for (auto it = directions.begin(); it != directions.end(); it++) {
+			Cell adjacent = curr + *it;
+			if (!isInside(grid, adjacent)) continue;
+
+			if (copy[adjacent._x][adjacent._y] == FLOOR) {
+				copy[adjacent._x][adjacent._y] = copy[curr._x][curr._y] - 1;
+				path.push(adjacent);
+			} else if (copy[adjacent._x][adjacent._y] == END) {
+				backtrack(grid, copy, adjacent, copy[curr._x][curr._y]);
+				cout << "Solved Map" << endl;
+				print(copy);
+				save(copy, "solving.txt");
+			}
+		}
+	}
+
+}
+
+vector<vector<int>> readMap(string path) {
+	vector<vector<int>> grid;
+	ifstream file(path);
+	if (file.is_open()) {
+		for (string line; getline(file,line);) {
+  			vector<int> row;
+  			
+  			size_t pos = 0;
+
+  			while ((pos = line.find(",") != string::npos)) {
+  				row.push_back(stoi(line.substr(0, pos)));
+  				line.erase(0, pos + 1);
+  			}
+
+  			row.push_back(stoi(line));
+  			grid.push_back(row);
+		}
+		file.close();
+	}
+	return grid;
 }
 
 int main(int argc, char *argv[]) {
@@ -256,7 +377,10 @@ int main(int argc, char *argv[]) {
 	vector<vector<int>> grid(x,vector<int>(y));
 	srand (time(NULL));
 
+	// grid = readMap("file.txt");
 	generateMap(grid, easy);
 
 	print(grid);
+	save(grid, "unsolved.txt");
+	solveMap(grid);
 }
