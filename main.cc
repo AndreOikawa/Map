@@ -63,7 +63,7 @@ Cell getEmptyCell(const vector<vector<int>>& grid) {
 	Cell cell;
 	do {
 		cell = Cell(rand() % x, rand() % y);	
-	} while(grid[cell._x][cell._y] != WALL);
+	} while(grid[cell._x][cell._y] != WALL || cell._x % 2 == 0 || cell._y % 2 == 0);
 	return cell;
 }
 
@@ -147,19 +147,53 @@ void generateMap(vector<vector<int>>& grid, bool easy) {
 		directions.push_back(Cell(1,0));
 		directions.push_back(Cell(-1,0));
 		random_shuffle(directions.begin(), directions.end());
-
+		queue<Cell> endFill;
 		while(!floors.empty()) {
 			Cell floor = floors.front();
+			endFill.push(floor);
 			floors.pop();
+			int dirs = rand()%4;
+			for (auto it = directions.begin() + dirs; it != directions.end(); it++) {
+				Cell tryFloor = floor + *it;
+				Cell tryFloorDouble = tryFloor + *it;
+				if (isValidFloor(grid, tryFloorDouble) && isValidFloor(grid, tryFloor)) {
+					grid[tryFloor._x][tryFloor._y] = floor._source;//FLOOR;
+					grid[tryFloorDouble._x][tryFloorDouble._y] = floor._source;//FLOOR;
+
+					tryFloor._source = floor._source;
+					tryFloorDouble._source = floor._source;
+					// cout << (floor._source == START ? "start" : "end") << endl;
+					// floors.push(tryFloor);
+					// floors.push(floor);
+					floors.push(tryFloorDouble);
+					// dirs--;
+					// if (dirs < 0)
+					// 	break;
+				}
+			}
+			random_shuffle(directions.begin(), directions.end());
+		}
+		floors = endFill;
+		while(!floors.empty()) {
+			Cell floor = floors.front();			
+			floors.pop();
+			
 			for (auto it = directions.begin(); it != directions.end(); it++) {
 				Cell tryFloor = floor + *it;
-				if (isValidFloor(grid, tryFloor)) {
+				Cell tryFloorDouble = tryFloor + *it;
+				if (isValidFloor(grid, tryFloorDouble) && isValidFloor(grid, tryFloor)) {
 					grid[tryFloor._x][tryFloor._y] = floor._source;//FLOOR;
+					grid[tryFloorDouble._x][tryFloorDouble._y] = floor._source;//FLOOR;
+
 					tryFloor._source = floor._source;
+					tryFloorDouble._source = floor._source;
 					// cout << (floor._source == START ? "start" : "end") << endl;
-					floors.push(tryFloor);
-					floors.push(floor);
-					break;
+					// floors.push(tryFloor);
+					// floors.push(floor);
+					floors.push(tryFloorDouble);
+					// dirs--;
+					// if (dirs < 0)
+					// 	break;
 				}
 			}
 			random_shuffle(directions.begin(), directions.end());
@@ -276,7 +310,7 @@ void backtrack(vector<vector<int>>& grid, vector<vector<int>>& copy, Cell end, i
 
 	cout << "Solved" << endl;
 	print(grid);
-	save(grid, "solution.txt");
+	save(grid, "solution.csv");
 
 
 }
@@ -324,7 +358,7 @@ void solveMap(vector<vector<int>>& grid) {
 				backtrack(grid, copy, adjacent, copy[curr._x][curr._y]);
 				cout << "Solved Map" << endl;
 				print(copy);
-				save(copy, "solving.txt");
+				save(copy, "solving.csv");
 			}
 		}
 	}
@@ -356,18 +390,18 @@ vector<vector<int>> readMap(string path) {
 int main(int argc, char *argv[]) {
 	// cout << argc << endl;
 	if (argc != 3 && argc != 1) {
-		cout << "Require grid size:  x y" << endl << "Default: 10x10" << endl;
+		cout << "Require grid size:  x y" << endl << "Default: 11x11" << endl;
 		return 1;
 	}
 
-	int x = 10;
-	int y = 10;
+	int x = 11;
+	int y = 11;
 	bool easy = false;
 	if (argc >= 3) {
 		istringstream(argv[1]) >> x;
 		istringstream(argv[2]) >> y;
-		if (x == 0) x = 10;
-		if (y == 0) y = 10;
+		if (x == 0) x = 11;
+		if (y == 0) y = 11;
 		cout << "Grid size " << x << "x" << y << endl;
 	}
 	if (argc == 4) {
@@ -381,6 +415,6 @@ int main(int argc, char *argv[]) {
 	generateMap(grid, easy);
 
 	print(grid);
-	save(grid, "unsolved.txt");
+	save(grid, "unsolved.csv");
 	solveMap(grid);
 }
